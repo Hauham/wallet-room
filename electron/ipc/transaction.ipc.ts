@@ -5,6 +5,10 @@
 
 import type { IpcMain } from 'electron';
 import { walletService } from './wallet.ipc';
+import { buildTransaction as btcBuild } from '../../src/chains/btc/btc.transaction';
+import { buildTransaction as ethBuild } from '../../src/chains/eth/eth.transaction';
+import { buildTransaction as xrpBuild } from '../../src/chains/xrp/xrp.transaction';
+import { buildTransaction as tronBuild } from '../../src/chains/tron/tron.transaction';
 
 interface BuildTransactionParams {
   chain: string;
@@ -82,21 +86,38 @@ class MockTransactionService {
       };
     }
 
-    const txId = `tx_${Date.now()}_${++this.txCounter}`;
+    try {
+      // Use real chain-specific build functions
+      let unsignedTx: UnsignedTransaction;
 
-    const unsignedTx: UnsignedTransaction = {
-      id: txId,
-      chain: params.chain,
-      from: params.from,
-      to: params.to,
-      amount: params.amount,
-      fee: this.getDefaultFee(params.chain),
-      memo: params.memo,
-      createdAt: Date.now(),
-      ...this.getChainSpecificFields(params, prerequisites),
-    };
+      switch (params.chain) {
+        case 'BTC':
+          unsignedTx = btcBuild(params as any, prerequisites as any);
+          break;
+        case 'ETH':
+          unsignedTx = ethBuild(params as any, prerequisites as any);
+          break;
+        case 'XRP':
+          unsignedTx = xrpBuild(params as any, prerequisites as any);
+          break;
+        case 'TRON':
+          unsignedTx = tronBuild(params as any, prerequisites as any);
+          break;
+        default:
+          return {
+            success: false,
+            error: { message: `Unsupported chain: ${params.chain}` },
+          };
+      }
 
-    return { success: true, data: unsignedTx };
+      return { success: true, data: unsignedTx };
+    } catch (err) {
+      console.error('[TransactionService] Build transaction error:', err);
+      return {
+        success: false,
+        error: { message: err instanceof Error ? err.message : 'Failed to build transaction' },
+      };
+    }
   }
 
   private getDefaultFee(chain: string): string {

@@ -10,6 +10,7 @@ import { Layout } from '@/components/layout';
 import {
   Dashboard,
   Wallets,
+  WalletDetail,
   CreateWallet,
   SignTransaction,
   Settings,
@@ -67,6 +68,14 @@ function AppRoutes(): React.ReactElement {
         element={
           <ProtectedRoute>
             <Wallets />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wallet/:id"
+        element={
+          <ProtectedRoute>
+            <WalletDetail />
           </ProtectedRoute>
         }
       />

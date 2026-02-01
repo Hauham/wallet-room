@@ -9,7 +9,6 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   UnsignedTransaction,
   SignedTransaction,
-  UTXO,
   BuildTransactionParams,
   TransactionPrerequisites,
   BtcAddressType,
@@ -63,9 +62,6 @@ export function buildTransaction(
     );
   }
 
-  // Calculate change
-  const change = totalAvailable - amountSats - estimatedFee;
-
   return {
     id: uuidv4(),
     chain: 'BTC',
@@ -111,37 +107,50 @@ export function signTransaction(
 
   // Add inputs
   for (const utxo of utxos) {
+    // Convert txid hex string to Buffer (reversed for little-endian)
+    const txidBuffer = Buffer.from(utxo.txid, 'hex').reverse();
+
     const inputData: bitcoin.PsbtTxInput = {
-      hash: utxo.txid,
+      hash: txidBuffer,
       index: utxo.vout,
     };
 
     // Add witness/redeem script based on address type
     if (addressType === 'legacy') {
       // P2PKH requires non-witness UTXO (full previous tx)
-      // For simplicity, we use scriptPubKey
-      (inputData as Record<string, unknown>)['nonWitnessUtxo'] = undefined;
+      // For simplicity, we skip nonWitnessUtxo - caller should provide it
     } else if (addressType === 'segwit') {
       // P2SH-P2WPKH
-      (inputData as Record<string, unknown>)['witnessUtxo'] = {
-        script: Buffer.from(utxo.scriptPubKey, 'hex'),
-        value: BigInt(utxo.value),
-      };
-      (inputData as Record<string, unknown>)['redeemScript'] = payment.redeem?.output;
+      psbt.addInput({
+        ...inputData,
+        witnessUtxo: {
+          script: Buffer.from(utxo.scriptPubKey, 'hex'),
+          value: Number(utxo.value),
+        },
+        redeemScript: payment.redeem?.output,
+      });
+      continue;
     } else if (addressType === 'native-segwit') {
       // P2WPKH
-      (inputData as Record<string, unknown>)['witnessUtxo'] = {
-        script: Buffer.from(utxo.scriptPubKey, 'hex'),
-        value: BigInt(utxo.value),
-      };
+      psbt.addInput({
+        ...inputData,
+        witnessUtxo: {
+          script: Buffer.from(utxo.scriptPubKey, 'hex'),
+          value: Number(utxo.value),
+        },
+      });
+      continue;
     } else if (addressType === 'taproot') {
       // P2TR
-      (inputData as Record<string, unknown>)['witnessUtxo'] = {
-        script: Buffer.from(utxo.scriptPubKey, 'hex'),
-        value: BigInt(utxo.value),
-      };
-      (inputData as Record<string, unknown>)['tapInternalKey'] =
-        keyPair.publicKey.slice(1); // x-only pubkey
+      psbt.addInput({
+        ...inputData,
+        witnessUtxo: {
+          script: Buffer.from(utxo.scriptPubKey, 'hex'),
+          value: Number(utxo.value),
+        },
+        tapInternalKey: keyPair.publicKey.slice(1), // x-only pubkey
+      });
+      continue;
     }
 
     psbt.addInput(inputData);
@@ -150,37 +159,43 @@ export function signTransaction(
   // Add recipient output
   psbt.addOutput({
     address: to,
-    value: BigInt(amount),
+    value: Number(amount),
   });
 
   // Add change output if there's change
-  const totalInput = utxos.reduce((sum, utxo) => sum + BigInt(utxo.value), BigInt(0));
-  const change = totalInput - BigInt(amount) - BigInt(fee);
+  const totalInput = utxos.reduce((sum, utxo) => sum + Number(utxo.value), 0);
+  const changeValue = totalInput - Number(amount) - Number(fee);
 
-  if (change > BigInt(546)) {
+  if (changeValue > 546) {
     // Dust threshold
     psbt.addOutput({
       address: changeAddress || from,
-      value: change,
+      value: changeValue,
     });
   }
+
+  // Create signer object
+  const signer: bitcoin.Signer = {
+    publicKey: keyPair.publicKey,
+    sign: (hash: Buffer) => {
+      return Buffer.from(ecc.sign(hash, privateKey));
+    },
+  };
 
   // Sign all inputs
   for (let i = 0; i < utxos.length; i++) {
     if (addressType === 'taproot') {
-      psbt.signInput(i, {
+      // For taproot, use signSchnorr
+      const taprootSigner = {
         publicKey: keyPair.publicKey,
+        sign: signer.sign,
         signSchnorr: (hash: Buffer) => {
           return Buffer.from(ecc.signSchnorr(hash, privateKey));
         },
-      });
+      };
+      psbt.signInput(i, taprootSigner);
     } else {
-      psbt.signInput(i, {
-        publicKey: keyPair.publicKey,
-        sign: (hash: Buffer) => {
-          return Buffer.from(ecc.sign(hash, privateKey));
-        },
-      });
+      psbt.signInput(i, signer);
     }
   }
 

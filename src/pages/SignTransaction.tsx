@@ -24,6 +24,14 @@ export function SignTransaction(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Chain-specific prerequisites
+  const [nonce, setNonce] = useState('');
+  const [gasPrice, setGasPrice] = useState('');
+  const [gasLimit, setGasLimit] = useState('21000');
+  const [sequence, setSequence] = useState('');
+  const [destinationTag, setDestinationTag] = useState('');
+  const [feeRate, setFeeRate] = useState('10');
+
   // Filter active wallets
   const activeWallets = wallets.filter((w) => w.isActive);
 
@@ -63,18 +71,50 @@ export function SignTransaction(): React.ReactElement {
         }
       }
 
-      // Build transaction
+      // Validate chain-specific prerequisites
+      if (selectedWallet.chain === 'ETH') {
+        if (!nonce.trim() || isNaN(parseInt(nonce))) {
+          setError('Please enter a valid nonce (get from blockchain explorer)');
+          return;
+        }
+        if (!gasPrice.trim() || isNaN(parseFloat(gasPrice))) {
+          setError('Please enter a valid gas price in Gwei');
+          return;
+        }
+      }
+
+      if (selectedWallet.chain === 'XRP') {
+        if (!sequence.trim() || isNaN(parseInt(sequence))) {
+          setError('Please enter a valid sequence number (get from XRP explorer)');
+          return;
+        }
+      }
+
+      // Build transaction params
       const params = {
         chain: selectedWallet.chain,
         from: selectedWallet.address,
         to: recipient.trim(),
         amount: amount.trim(),
         memo: memo.trim() || undefined,
+        // ETH specific
+        gasLimit: selectedWallet.chain === 'ETH' ? gasLimit : undefined,
+        gasPrice: selectedWallet.chain === 'ETH' ? (BigInt(parseFloat(gasPrice) * 1e9)).toString() : undefined,
+        // BTC specific
+        feeRate: selectedWallet.chain === 'BTC' ? parseInt(feeRate) : undefined,
+        // XRP specific
+        destinationTag: selectedWallet.chain === 'XRP' && destinationTag ? parseInt(destinationTag) : undefined,
       };
 
       const prerequisites = {
         chain: selectedWallet.chain,
         address: selectedWallet.address,
+        // ETH specific
+        nonce: selectedWallet.chain === 'ETH' ? parseInt(nonce) : undefined,
+        // XRP specific
+        sequence: selectedWallet.chain === 'XRP' ? parseInt(sequence) : undefined,
+        // BTC specific - UTXOs would need to be provided in a real implementation
+        utxos: selectedWallet.chain === 'BTC' ? [] : undefined,
       };
 
       if (window.walletRoom) {
@@ -149,6 +189,13 @@ export function SignTransaction(): React.ReactElement {
     setUnsignedTx(null);
     setSignedTxHash(null);
     setError(null);
+    // Reset prerequisites
+    setNonce('');
+    setGasPrice('');
+    setGasLimit('21000');
+    setSequence('');
+    setDestinationTag('');
+    setFeeRate('10');
   };
 
   // Select wallet step
@@ -251,6 +298,98 @@ export function SignTransaction(): React.ReactElement {
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
             />
+
+            {/* Chain-specific prerequisites */}
+            {selectedWallet.chain === 'ETH' && (
+              <div className="p-4 bg-slate-700/50 rounded-lg space-y-4">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Offline Mode: Enter values from Etherscan</span>
+                </div>
+                <Input
+                  label="Nonce (Required)"
+                  type="number"
+                  placeholder="Get from Etherscan"
+                  value={nonce}
+                  onChange={(e) => setNonce(e.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Gas Price (Gwei)"
+                    type="number"
+                    placeholder="20"
+                    value={gasPrice}
+                    onChange={(e) => setGasPrice(e.target.value)}
+                  />
+                  <Input
+                    label="Gas Limit"
+                    type="number"
+                    placeholder="21000"
+                    value={gasLimit}
+                    onChange={(e) => setGasLimit(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedWallet.chain === 'XRP' && (
+              <div className="p-4 bg-slate-700/50 rounded-lg space-y-4">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Offline Mode: Enter values from XRP Explorer</span>
+                </div>
+                <Input
+                  label="Account Sequence (Required)"
+                  type="number"
+                  placeholder="Get from XRP explorer"
+                  value={sequence}
+                  onChange={(e) => setSequence(e.target.value)}
+                />
+                <Input
+                  label="Destination Tag (Optional)"
+                  type="number"
+                  placeholder="For exchanges"
+                  value={destinationTag}
+                  onChange={(e) => setDestinationTag(e.target.value)}
+                />
+              </div>
+            )}
+
+            {selectedWallet.chain === 'BTC' && (
+              <div className="p-4 bg-slate-700/50 rounded-lg space-y-4">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Offline Mode: BTC requires UTXOs (not yet supported)</span>
+                </div>
+                <Input
+                  label="Fee Rate (sat/vB)"
+                  type="number"
+                  placeholder="10"
+                  value={feeRate}
+                  onChange={(e) => setFeeRate(e.target.value)}
+                />
+                <p className="text-slate-400 text-sm">
+                  BTC transactions require UTXO data. Please use QR import for offline signing.
+                </p>
+              </div>
+            )}
+
+            {selectedWallet.chain === 'TRON' && (
+              <div className="p-4 bg-slate-700/50 rounded-lg">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Offline Mode: TRON requires block reference (using defaults)</span>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
@@ -403,7 +542,8 @@ export function SignTransaction(): React.ReactElement {
     );
   }
 
-  return null;
+  // This should not be reached due to step control
+  return <></>;
 }
 
 // Helper components

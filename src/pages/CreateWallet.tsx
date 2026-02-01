@@ -317,5 +317,6 @@ export function CreateWallet(): React.ReactElement {
     );
   }
 
-  return null;
+  // This should not be reached due to step control
+  return <></>;
 }

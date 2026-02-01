@@ -2,8 +2,7 @@
  * XRP Ledger transaction building and signing
  */
 
-import { encode, decode } from 'xrpl';
-import { sign } from 'xrpl/dist/npm/Wallet/signer';
+import { decode, Wallet } from 'xrpl';
 import { deriveKeypair } from 'xrpl';
 import { v4 as uuidv4 } from 'uuid';
 import type {
@@ -88,11 +87,10 @@ export function signTransaction(
   // Derive keypair from private key
   const keypair = deriveKeypair('00' + privateKeyHex);
 
-  // Sign the transaction
-  const signedResult = sign(JSON.stringify(txJson), keypair);
-
-  // Parse the signed blob to get the hash
-  const decoded = decode(signedResult.tx_blob);
+  // Create wallet from keypair and sign
+  const wallet = new Wallet(keypair.publicKey, keypair.privateKey);
+  // Cast to unknown first to satisfy TypeScript
+  const signedResult = wallet.sign(txJson as unknown as Parameters<typeof wallet.sign>[0]);
 
   return {
     unsignedTxId: unsignedTx.id,

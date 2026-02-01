@@ -12,6 +12,9 @@ import * as bitcoin from 'bitcoinjs-lib';
 import { initEccLib } from 'bitcoinjs-lib';
 import { ethers, HDNodeWallet } from 'ethers';
 import { signTransaction as ethSign } from '../../src/chains/eth/eth.transaction';
+import { signTransaction as btcSign } from '../../src/chains/btc/btc.transaction';
+import { signTransaction as xrpSign } from '../../src/chains/xrp/xrp.transaction';
+import { signTransaction as tronSign } from '../../src/chains/tron/tron.transaction';
 import { deriveKeypair, deriveAddress as xrplDeriveAddress } from 'xrpl';
 import { sha256 } from '@noble/hashes/sha256';
 import { keccak_256 } from '@noble/hashes/sha3';
@@ -589,19 +592,32 @@ class RealWalletService {
       }
 
       let privateKey = this.decryptedKeys.get(walletId);
+      console.log("privateKey", privateKey)
       if (!privateKey) {
         privateKey = await this.decrypt(stored.encrypted, this.password!);
         this.decryptedKeys.set(walletId, privateKey);
       }
 
-      // Use ETH-specific signer when chain is ETH
-      if (unsignedTx.chain === 'ETH') {
-        const signed = ethSign(unsignedTx, privateKey);
-        return { success: true, data: signed };
+      // Sign based on chain type
+      let signed;
+      switch (unsignedTx.chain) {
+        case 'ETH':
+          signed = ethSign(unsignedTx, privateKey);
+          break;
+        case 'BTC':
+          signed = btcSign(unsignedTx, privateKey);
+          break;
+        case 'XRP':
+          signed = xrpSign(unsignedTx, privateKey);
+          break;
+        case 'TRON':
+          signed = tronSign(unsignedTx, privateKey);
+          break;
+        default:
+          return { success: false, error: { message: `Unsupported chain: ${unsignedTx.chain}` } };
       }
 
-      // For other chains, return a not-implemented error
-      return { success: false, error: { message: 'Sign for this chain not implemented in wallet service' } };
+      return { success: true, data: signed };
     } catch (err) {
       return { success: false, error: { message: err instanceof Error ? err.message : 'Failed to sign transaction' } };
     }

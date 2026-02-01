@@ -105,25 +105,10 @@ export function signTransaction(
   // Hash the transaction data
   const txHash = sha256(rawTxData);
 
-  // Sign with secp256k1
-  const signature = ecc.sign(txHash, privateKey);
+  // Sign with secp256k1 and get recovery ID
+  const { signature, recoveryId } = ecc.signRecoverable(txHash, privateKey);
 
-  // Get recovery ID
-  const publicKey = ecc.pointFromScalar(privateKey, true)!;
-  let recoveryId = 0;
-  for (let i = 0; i < 4; i++) {
-    try {
-      const recovered = ecc.recoverPublicKey(txHash, signature, i, true);
-      if (recovered && Buffer.from(recovered).equals(Buffer.from(publicKey))) {
-        recoveryId = i;
-        break;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  // Combine signature with recovery ID
+  // Combine signature with recovery ID (TRON uses 27/28 for v)
   const signatureWithRecovery = Buffer.concat([
     Buffer.from(signature),
     Buffer.from([recoveryId + 27]),

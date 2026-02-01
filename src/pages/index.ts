@@ -4,6 +4,7 @@
 
 export { Dashboard } from './Dashboard';
 export { Wallets } from './Wallets';
+export { WalletDetail } from './WalletDetail';
 export { CreateWallet } from './CreateWallet';
 export { SignTransaction } from './SignTransaction';
 export { Settings } from './Settings';

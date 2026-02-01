@@ -13,7 +13,7 @@ import type {
 import { ethToWei, estimateTransferGas } from './eth.utils';
 
 /** Ethereum mainnet chain ID */
-const ETH_CHAIN_ID = 1;
+const ETH_CHAIN_ID = 11155111;
 
 /**
  * Builds an unsigned Ethereum transaction

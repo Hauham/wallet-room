@@ -10,10 +10,10 @@ import { XrpService } from './xrp';
 import { TronService } from './tron';
 
 export * from './types';
-export * from './btc';
-export * from './eth';
-export * from './xrp';
-export * from './tron';
+export { BtcService } from './btc';
+export { EthService } from './eth';
+export { XrpService } from './xrp';
+export { TronService } from './tron';
 
 /** Singleton instances of chain services */
 const chainServices: ChainServiceRegistry = {
