@@ -15,8 +15,12 @@ import {
 describe('ETH Utils', () => {
   describe('isValidEthAddress', () => {
     it('should validate valid Ethereum addresses', () => {
-      expect(isValidEthAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f6b2F3')).toBe(true);
+      // Correct checksummed address
+      expect(isValidEthAddress('0x742d35cc6634C0532925a3b844Bc9E7595f6B2F3')).toBe(true);
+      // Zero address
       expect(isValidEthAddress('0x0000000000000000000000000000000000000000')).toBe(true);
+      // Lowercase address should also be valid
+      expect(isValidEthAddress('0x742d35cc6634c0532925a3b844bc9e7595f6b2f3')).toBe(true);
     });
 
     it('should reject invalid addresses', () => {
@@ -56,7 +60,10 @@ describe('EthService', () => {
 
   describe('validateAddress', () => {
     it('should validate Ethereum addresses', () => {
-      expect(service.validateAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f6b2F3')).toBe(true);
+      // Correct checksummed address
+      expect(service.validateAddress('0x742d35cc6634C0532925a3b844Bc9E7595f6B2F3')).toBe(true);
+      // Lowercase address should also be valid
+      expect(service.validateAddress('0x742d35cc6634c0532925a3b844bc9e7595f6b2f3')).toBe(true);
       expect(service.validateAddress('invalid')).toBe(false);
     });
   });

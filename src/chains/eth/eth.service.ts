@@ -11,7 +11,7 @@ import type {
   BuildTransactionParams,
   TransactionPrerequisites,
 } from '@/types';
-import { isValidEthAddress, toChecksumAddress } from './eth.utils';
+import { isValidEthAddress, deriveAddressFromPublicKey } from './eth.utils';
 import { deriveFromSeed } from './eth.wallet';
 import {
   buildTransaction as buildTx,
@@ -35,11 +35,11 @@ export class EthService implements IChainService {
 
   /**
    * Derives address from public key
+   * @param publicKey - Uncompressed public key in hex format (65 bytes with 04 prefix)
+   * @returns Ethereum checksum address
    */
   deriveAddress(publicKey: string): string {
-    // For ETH, the address is derived from the public key
-    // ethers handles this internally
-    return toChecksumAddress(publicKey);
+    return deriveAddressFromPublicKey(publicKey);
   }
 
   /**

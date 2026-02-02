@@ -30,14 +30,16 @@ export function deriveFromSeed(
 /**
  * Derives wallet from mnemonic
  * @param mnemonic - BIP39 mnemonic phrase
- * @param derivationPath - HD derivation path
+ * @param derivationPath - HD derivation path (e.g., "m/44'/60'/0'/0/0")
  * @returns Wallet instance
  */
 export function deriveFromMnemonic(
   mnemonic: string,
   derivationPath: string
 ): { publicKey: string; address: string; privateKey?: string } {
-  const hdNode = HDNodeWallet.fromPhrase(mnemonic);
+  // Create HD node from mnemonic seed (at root, depth 0)
+  const seed = ethers.Mnemonic.fromPhrase(mnemonic).computeSeed();
+  const hdNode = HDNodeWallet.fromSeed(seed);
   const derived = hdNode.derivePath(derivationPath);
 
   return {

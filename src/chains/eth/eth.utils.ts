@@ -6,12 +6,20 @@ import { ethers } from 'ethers';
 
 /**
  * Validates an Ethereum address
+ * Accepts both checksummed and lowercase addresses
  * @param address - Address to validate
  * @returns true if valid
  */
 export function isValidEthAddress(address: string): boolean {
   try {
-    return ethers.isAddress(address);
+    // ethers.isAddress is strict about checksum
+    // We also accept lowercase addresses by trying to convert them
+    if (ethers.isAddress(address)) {
+      return true;
+    }
+    // Try to get checksum address - if it works, it's a valid address
+    ethers.getAddress(address);
+    return true;
   } catch {
     return false;
   }
@@ -73,30 +81,18 @@ export function weiToGwei(wei: string | bigint): string {
 
 /**
  * Derives address from public key
- * @param publicKeyHex - Uncompressed public key in hex (65 bytes with 04 prefix)
- * @returns Ethereum address
+ * Supports both compressed (33 bytes, 02/03 prefix) and uncompressed (65 bytes, 04 prefix) formats
+ * @param publicKeyHex - Public key in hex format
+ * @returns Ethereum checksum address
  */
 export function deriveAddressFromPublicKey(publicKeyHex: string): string {
-  // Remove 0x prefix if present
-  let pubKey = publicKeyHex.startsWith('0x')
-    ? publicKeyHex.slice(2)
-    : publicKeyHex;
+  // Normalize public key to have 0x prefix
+  const normalizedPubKey = publicKeyHex.startsWith('0x')
+    ? publicKeyHex
+    : '0x' + publicKeyHex;
 
-  // For compressed public key (33 bytes), we need to decompress
-  // For uncompressed (65 bytes with 04 prefix), remove the prefix
-  if (pubKey.length === 66 && pubKey.startsWith('04')) {
-    pubKey = pubKey.slice(2); // Remove 04 prefix
-  } else if (pubKey.length === 130 && pubKey.startsWith('04')) {
-    pubKey = pubKey.slice(2);
-  }
-
-  // Keccak256 of the public key (x,y coordinates without prefix)
-  const hash = ethers.keccak256('0x' + pubKey);
-
-  // Take last 20 bytes (40 hex chars)
-  const address = '0x' + hash.slice(-40);
-
-  return ethers.getAddress(address);
+  // ethers.computeAddress handles both compressed and uncompressed public keys
+  return ethers.computeAddress(normalizedPubKey);
 }
 
 /**
